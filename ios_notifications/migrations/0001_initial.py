@@ -4,12 +4,7 @@ from south.db import db
 from south.v2 import SchemaMigration
 from django.db import models
 
-try:
-    from django.contrib.auth import get_user_model
-except ImportError:  # django < 1.5
-    from django.contrib.auth.models import User
-else:
-    User = get_user_model()
+from ios_notifications.compat import user_model_label
 
 
 class Migration(SchemaMigration):
@@ -59,13 +54,16 @@ class Migration(SchemaMigration):
         # Adding unique constraint on 'Device', fields ['token', 'service']
         db.create_unique('ios_notifications_device', ['token', 'service_id'])
 
+        user_model_simple_class_name = user_model_label.split('.')[-1].lower()
         # Adding M2M table for field users on 'Device'
         db.create_table('ios_notifications_device_users', (
             ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
             ('device', models.ForeignKey(orm['ios_notifications.device'], null=False)),
-            ('user', self.gf('django.db.models.fields.related.ForeignKey')(to=User)),
+            # ('user', self.gf('django.db.models.fields.related.ForeignKey')(to=User)),
+            # ('user', models.ForeignKey(orm[user_model_label], null=False))
+            (user_model_simple_class_name, models.ForeignKey(orm[user_model_label], null=False))
         ))
-        db.create_unique('ios_notifications_device_users', ['device_id', 'user_id'])
+        db.create_unique('ios_notifications_device_users', ['device_id', '%s_id' % user_model_simple_class_name])
 
         # Adding model 'FeedbackService'
         db.create_table('ios_notifications_feedbackservice', (
@@ -120,8 +118,8 @@ class Migration(SchemaMigration):
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '50'})
         },
-        'auth.user': {
-            'Meta': {'object_name': 'User'},
+        user_model_label: {
+            'Meta': {'object_name': user_model_label.split('.')[-1]},
             'date_joined': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now'}),
             'email': ('django.db.models.fields.EmailField', [], {'max_length': '75', 'blank': 'True'}),
             'first_name': ('django.db.models.fields.CharField', [], {'max_length': '30', 'blank': 'True'}),
@@ -164,7 +162,7 @@ class Migration(SchemaMigration):
             'platform': ('django.db.models.fields.CharField', [], {'max_length': '30', 'null': 'True', 'blank': 'True'}),
             'service': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['ios_notifications.APNService']"}),
             'token': ('django.db.models.fields.CharField', [], {'max_length': '64'}),
-            'users': ('django.db.models.fields.related.ManyToManyField', [], {'blank': 'True', 'related_name': "'ios_devices'", 'null': 'True', 'symmetrical': 'False', 'to': "orm['auth.User']"})
+            'users': ('django.db.models.fields.related.ManyToManyField', [], {'blank': 'True', 'related_name': "'ios_devices'", 'null': 'True', 'symmetrical': 'False', 'to': "orm['%s']" % user_model_label})
         },
         'ios_notifications.feedbackservice': {
             'Meta': {'unique_together': "(('name', 'hostname'),)", 'object_name': 'FeedbackService'},
